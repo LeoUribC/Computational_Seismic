@@ -30,7 +30,7 @@ class Trajectory:
         for medium, t, i in zip(cases, trail, interfaces):
             j = self._get_j(t, medium)
             segment_signature = self._assign_segment_signature(
-                current_m_index, len(trail), [j,i]
+                current_m_index, self.ray.segments, [j,i]
             )
             signature.append(segment_signature)
             current_m_index += 1
