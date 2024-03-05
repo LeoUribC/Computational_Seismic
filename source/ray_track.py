@@ -24,10 +24,11 @@ class Trajectory:
             and one last j for a single sequence of 'P' and 'S'
         """
         trail = self.ray.trail
+        interfaces = self.ray.interfaces
         signature = []
         current_m_index = 0
-        for medium, i in zip(cases, trail):
-            j = self._get_j(i, medium)
+        for medium, t, i in zip(cases, trail, interfaces):
+            j = self._get_j(t, medium)
             segment_signature = self._assign_segment_signature(
                 current_m_index, len(trail), [j,i]
             )

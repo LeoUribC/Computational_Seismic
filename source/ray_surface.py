@@ -1,9 +1,10 @@
 # on development
 class Ray:
 
-    def __init__(self, segments, trail):
-        self.segments = segments
+    def __init__(self, trail, interfaces):
+        self.segments = len(trail)
         self.trail = trail
+        self.interfaces = interfaces
         pass
 
 
