@@ -22,7 +22,7 @@ def build_matrices(vector, h):
     return forward, backward
 
 
-def get_jacobian(F, vector, h=1e-3):
+def get_jacobian(F, vector, h=1e-5):
     """
     Calcula aproximacion para la matriz Jacobiana
     evaluada en un vector
@@ -34,25 +34,30 @@ def get_jacobian(F, vector, h=1e-3):
     return J
 
 
-def get_k_values():
+def get_k_values(F, wj, X0, h):
     """
     Proceso para obtener los vectores kn
     """
+
+    b = -h*F(X0)
+
+    k1 = np.linalg.solve( get_jacobian(F, wj), b )
+    k2 = np.linalg.solve( get_jacobian(F, wj + 0.5*k1), b )
+    k3 = np.linalg.solve( get_jacobian(F, wj + 0.5*k2), b )
+    k4 = np.linalg.solve( get_jacobian(F, wj + k3), b )
+
+    return k1, k2, k3, k4
+
+
+def get_solution(F, X0, h):
     
-    k1, k2, k3, k4, wj = 0
-    return k1, k2, k3, k4, wj
+    lambdas = np.arange(0.0, 1.0, h)
 
+    k1, k2, k3, k4 = get_k_values(F, X0, X0, h)
+    w = X0 + (1/6) * (k1 + 2*k2 + 2*k3 + k4)
 
-def get_next_xlambda():
-    pass
-
-
-def get_solution(X0, h=1e-2):
+    for _ in lambdas[1:]:
+        k1, k2, k3, k4 = get_k_values(F, w, X0, h)
+        w = w + (1/6) * (k1 + 2*k2 + 2*k3 + k4)
     
-    lambdas = np.arange(0, 1+h, h)
-    xapprox = X0
-
-    while True:
-        xapprox = get_next_xlambda(xapprox)
-    
-    return xapprox
+    return w
