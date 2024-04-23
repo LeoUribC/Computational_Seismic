@@ -54,9 +54,9 @@ class SystemBuilder:
             y_curr = self.surface.interface_functions[curr_interface]
             y_curr = sp.lambdify(x, y_curr, 'numpy')( self.x_shot[k] )
             y_prev = self.surface.interface_functions[prev_interface]
-            y_prev = sp.lambdify(x, y_prev, 'numpy')( self.x_shot[x] )
+            y_prev = sp.lambdify(x, y_prev, 'numpy')( self.x_shot[k-1] )
             y_next = self.surface.interface_functions[next_interface]
-            y_next = sp.lambdify(x, y_next, 'numpy')( self.x_shot[k] )
+            y_next = sp.lambdify(x, y_next, 'numpy')( self.x_shot[k+1] )
 
             yprime_curr = first_derivatives[curr_interface]
             yprime_curr = sp.lambdify(x, yprime_curr, 'numpy')( self.x_shot[k] )
@@ -83,22 +83,96 @@ class SystemBuilder:
         return np.array(ak)
 
 
-    def _build_bk(self, k):
-        pass
+
+    def _build_bk(self):
+
+        x, k = sp.symbols('x'), 1
+        bk = []
+
+        first_derivatives, _ = self._get_first_second_derivatives(self)
+
+        # update every self.x_shot
+
+        while k < len(self.x_shot) - 1:
+
+            curr_interface = self.ray.interfaces[k]
+            prev_interface = self.ray.interfaces[k-1]
+
+            y_curr = self.surface.interface_functions[curr_interface]
+            y_curr = sp.lambdify(x, y_curr, 'numpy')( self.x_shot[k] )
+            y_prev = self.surface.interface_functions[prev_interface]
+            y_prev = sp.lambdify(x, y_prev, 'numpy')( self.x_shot[k-1] )
+
+            yprime_curr = first_derivatives[curr_interface]
+            yprime_curr = sp.lambdify(x, yprime_curr, 'numpy')( self.x_shot[k] )
+            yprime_prev = first_derivatives[prev_interface]
+            yprime_prev = sp.lambdify(x, yprime_prev, 'numpy')( self.x_shot[k-1] )
+
+            Vk_next = self.surface.V[k+1]
+
+            dy_curr = y_curr - y_prev
+            dx_curr = self.x_shot[k] - self.x_shot[k-1]
+
+            D_curr = ( dx_curr**2 + dy_curr**2 )**0.5
+
+            bk += [ -(Vk_next/D_curr) * ( 1 + yprime_prev*yprime_curr -\
+                    ( (dx_curr + yprime_prev*dy_curr)/D_curr ) * ( (dx_curr + yprime_curr*dy_curr)/D_curr ) ) ]
+            k += 1
+
+        return np.array(bk)
 
 
-    def _build_ck(self, k):
-        pass
+
+    def _build_ck(self):
+
+        x, k = sp.symbols('x'), 0
+        ck = []
+
+        first_derivatives, _ = self._get_first_second_derivatives(self)
+
+        # update every self.x_shot
+
+        while k < len(self.x_shot) - 1:
+
+            curr_interface = self.ray.interfaces[k]
+            next_interface = self.ray.interfaces[k+1]
+
+            y_curr = self.surface.interface_functions[curr_interface]
+            y_curr = sp.lambdify(x, y_curr, 'numpy')( self.x_shot[k] )
+            y_next = self.surface.interface_functions[next_interface]
+            y_next = sp.lambdify(x, y_next, 'numpy')( self.x_shot[k+1] )
+
+            yprime_curr = first_derivatives[curr_interface]
+            yprime_curr = sp.lambdify(x, yprime_curr, 'numpy')( self.x_shot[k] )
+            yprime_next = first_derivatives[next_interface]
+            yprime_next = sp.lambdify(x, yprime_next, 'numpy')( self.x_shot[k+1] )
+
+            Vk_curr = self.surface.V[k]
+
+            dy_next = y_next - y_curr
+            dx_next = self.x_shot[k+1] - self.x_shot[k]
+
+            D_next = ( dx_next**2 + dy_next**2 )**0.5
+
+            ck += [ -(Vk_curr/D_next) * ( 1 + yprime_curr*yprime_next -\
+                    ( (dx_next + yprime_curr*dy_next)/D_next ) * ( (dx_next + yprime_next*dy_next)/D_next ) ) ]
+            k += 1
+
+        return np.array(ck)
 
 
     def _build_jacobian_matrix_A(self):
 
-        first_derivatives, second_derivatives = self._get_first_second_derivatives(self)
         ak = self._build_ak(self)
         bk = self._build_bk(self)
         ck = self._build_ck(self)
 
-        return np.array([bk, ak, ck])
+        # creating diagonals
+        ak_diag = np.diag(ak)
+        bk_diag = np.diag(bk, -1)
+        ck_diag = np.diag(ck, 1)
+
+        return ak_diag + bk_diag + ck_diag  # tridiagonal matrix
 
 
     def _build_bidiagonal_matrix_B(self):
@@ -106,9 +180,9 @@ class SystemBuilder:
 
 
     # final function for solving via homotopy
-    def solve(self):
+    def solve(self, dl):
 
-        # it runs modifying the attribute self.x_shot according to homotopy
+        # it runs modifying the attribute self.x_shot according to homotopy, iteration goes here
         Axv = self._build_jacobian_matrix_A(self)
         Bxv = self._build_bidiagonal_matrix_B(self)
 
