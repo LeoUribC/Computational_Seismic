@@ -11,7 +11,7 @@ class Ray:
 # on development
 class Surface:
 
-    def __init__(self, ray):
+    def __init__(self, ray: Ray):
         self.medium = ['P', 'S']
         self.ray = ray
         pass
