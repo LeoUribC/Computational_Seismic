@@ -86,7 +86,7 @@ class SystemBuilder:
 
     def _build_bk(self):
 
-        x, k = sp.symbols('x'), 1
+        x, k = sp.symbols('x'), 2
         bk = []
 
         first_derivatives, _ = self._get_first_second_derivatives(self)
@@ -125,14 +125,14 @@ class SystemBuilder:
 
     def _build_ck(self):
 
-        x, k = sp.symbols('x'), 0
+        x, k = sp.symbols('x'), 1
         ck = []
 
         first_derivatives, _ = self._get_first_second_derivatives(self)
 
         # update every self.x_shot
 
-        while k < len(self.x_shot) - 1:
+        while k < len(self.x_shot) - 2:
 
             curr_interface = self.ray.interfaces[k]
             next_interface = self.ray.interfaces[k+1]
@@ -175,17 +175,69 @@ class SystemBuilder:
         return ak_diag + bk_diag + ck_diag  # tridiagonal matrix
 
 
+    # function to get a bidiagonal matrix
     def _build_bidiagonal_matrix_B(self):
+
+        N, k = len(self.x_shot) - 2, 1
+        x = sp.symbols('x')
+        first_derivatives, _ = self._get_first_second_derivatives(self)
+
+        B = np.zeros( (N, N+1) )
+        main_diag, upper_diag = [], []
+        
+        while k <= N:
+
+            curr_interface = self.ray.interfaces[k]
+            prev_interface = self.ray.interfaces[k-1]
+            next_interface = self.ray.interfaces[k+1]
+
+            y_prev = self.surface.interface_functions[prev_interface]
+            y_prev = sp.lambdify(x, y_prev, 'numpy')( self.x_shot[k-1] )
+            y_curr = self.surface.interface_functions[curr_interface]
+            y_curr = sp.lambdify(x, y_curr, 'numpy')( self.x_shot[k] )
+            y_next = self.surface.interface_functions[next_interface]
+            y_next = sp.lambdify(x, y_next, 'numpy')( self.x_shot[k+1] )
+
+            yprime_curr = first_derivatives[curr_interface]
+            yprime_curr = sp.lambdify(x, yprime_curr, 'numpy')( self.x_shot[k] )
+
+            dy_curr = y_curr - y_prev
+            dy_next = y_next - y_curr
+            dx_curr = self.x_shot[k] - self.x_shot[k-1]
+            dx_next = self.x_shot[k+1] - self.x_shot[k]
+
+            D_curr = ( dx_curr**2 + dy_curr**2 )**0.5
+            D_next = ( dx_next**2 + dy_next**2 )**0.5
+
+            main_diag += [ -( (dx_next + yprime_curr * dy_next)/D_next ) ]
+            upper_diag += [ ( dx_curr + yprime_curr * dy_curr )/D_curr ]
+            
+            k += 1
+        
+        # building B
+        diag = np.arange(N)
+        B[diag, diag] = main_diag
+        B[diag, diag + 1] = upper_diag
+
+        return B
+    
+
+    def _get_v_hat(self):
         pass
 
 
     # final function for solving via homotopy
     def solve(self, dl):
 
+        iterations = np.arange(0, 1+dl, dl)
+
         # it runs modifying the attribute self.x_shot according to homotopy, iteration goes here
-        Axv = self._build_jacobian_matrix_A(self)
-        Bxv = self._build_bidiagonal_matrix_B(self)
+        for _ in iterations:
 
+            Axv = self._build_jacobian_matrix_A(self)
+            Bxv = self._build_bidiagonal_matrix_B(self)
+            v_hat = self._get_v_hat(self)
+            x_dot = np.linalg.solve( Axv, -np.dot(Bxv, self.surface.V - v_hat) )
+            self.x_shot = self.x_shot + dl*x_dot
 
-
-        pass
+        return self.x_shot
