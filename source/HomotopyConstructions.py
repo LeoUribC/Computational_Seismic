@@ -7,6 +7,7 @@ from ray_surface import *
 from ray_track import *
 import numpy as np
 import sympy as sp
+from DefinedErrors import *
 
 
 
@@ -226,10 +227,11 @@ class SystemBuilder:
         pass
 
 
-    # final function for solving via homotopy
-    def solve(self, dl):
+    # function for solving via homotopy, continuation is made on velocity
+    def get_first_ray(self, dl):
 
         iterations = np.arange(0, 1+dl, dl)
+        final_guess = self.x_shot
 
         # it runs modifying the attribute self.x_shot according to homotopy, iteration goes here
         for _ in iterations:
@@ -241,3 +243,71 @@ class SystemBuilder:
             self.x_shot = self.x_shot + dl*x_dot
 
         return self.x_shot
+
+
+
+    def _snell_law_equation(self, k, X):
+        '''
+        docstring
+        X must be every updated X vector from newton
+        '''
+
+        x = sp.symbols('x')
+
+        # (pending: change the velocities' source, surface velocities not follow signature velocities)
+        v_curr, v_next = self.surface.V[k], self.surface.V[k+1]
+        x_prev, x_curr, x_next = X[k-1], X[k], X[k+1]
+
+        curr_interface = self.ray.interfaces[k]
+        prev_interface = self.ray.interfaces[k-1]
+        next_interface = self.ray.interfaces[k+1]
+
+        y_prev = self.surface.interface_functions[prev_interface]
+        y_prev = sp.lambdify(x, y_prev, 'numpy')( x_prev )
+        y_curr = self.surface.interface_functions[curr_interface]
+        y_curr = sp.lambdify(x, y_curr, 'numpy')( x_curr )
+        y_next = self.surface.interface_functions[next_interface]
+        y_next = sp.lambdify(x, y_next, 'numpy')( x_next )
+
+        first_derivatives, _ = self._get_first_second_derivatives(self)
+        yprime_curr = first_derivatives[curr_interface]
+        yprime_curr = sp.lambdify(x, yprime_curr, 'numpy')( x_curr )
+
+        ray_before = v_next * ( (x_curr - x_prev) + yprime_curr * ( y_curr - y_prev ) ) /\
+            ( (x_curr - x_prev)**2 + (y_curr - y_prev)**2 )**0.5
+
+        ray_after = v_curr * ( (x_next - x_curr) + yprime_curr * (y_next - y_curr) ) /\
+            ( (x_next - x_curr)**2 + (y_next - y_curr)**2 )**0.5
+
+        return ray_before - ray_after
+
+
+    # iteratively calls _snell_law_equation
+    def _build_phi_array(self, X):
+        '''
+        '''
+        N = len(self.x_shot)-1
+        phi = [ self._snell_law_equation(self, k_, X) for k_ in range(1, N) ]
+
+        return np.array(phi)
+
+
+    def newton_solve(self, tol=1e-3, continuation='v'):
+        '''
+        args:
+            tol (float) : Error for calculations
+            continuation (string) : Must be either 'v' for applying continuation on
+                velocities or 'r' for continuation on receivers
+        returns:
+            ray_points (array) : solution of values on x where the ray interacts with
+                each interface throughout its trail.
+        '''
+
+        # raises an error for any string other than 'v' or 'r' on continuation parameter
+        if continuation not in ['v', 'r']:
+            raise ContinuationNotDefinedException
+        
+        A_newton = self._build_jacobian_matrix_A(self)
+
+
+        pass
