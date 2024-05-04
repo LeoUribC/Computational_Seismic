@@ -1,6 +1,6 @@
 """
-La idea es que resuelva para un solo rayo, luego se replica para
-todas las posibles combinaciones de rayos
+Calculations to homotopy, continuing on velocities, receivers and
+finally iterate with Newton Method to get final x positions of rays
 """
 
 from ray_surface import *
@@ -37,40 +37,40 @@ class SystemBuilder:
 
 
 
-    def _build_ak(self):
+    def _build_ak(self, X, next_case):
 
         x, k = sp.symbols('x'), 1
         ak = []
 
-        first_derivatives, second_derivatives = self._get_first_second_derivatives(self)
+        first_derivatives, second_derivatives = self._get_first_second_derivatives()
 
         # update every self.x_shot
 
-        while k < len(self.x_shot) - 1:
+        while k < len(X) - 1:
 
             curr_interface = self.ray.interfaces[k]
             prev_interface = self.ray.interfaces[k-1]
             next_interface = self.ray.interfaces[k+1]
 
             y_curr = self.surface.interface_functions[curr_interface]
-            y_curr = sp.lambdify(x, y_curr, 'numpy')( self.x_shot[k] )
+            y_curr = sp.lambdify(x, y_curr, 'numpy')( X[k] )
             y_prev = self.surface.interface_functions[prev_interface]
-            y_prev = sp.lambdify(x, y_prev, 'numpy')( self.x_shot[k-1] )
+            y_prev = sp.lambdify(x, y_prev, 'numpy')( X[k-1] )
             y_next = self.surface.interface_functions[next_interface]
-            y_next = sp.lambdify(x, y_next, 'numpy')( self.x_shot[k+1] )
+            y_next = sp.lambdify(x, y_next, 'numpy')( X[k+1] )
 
             yprime_curr = first_derivatives[curr_interface]
-            yprime_curr = sp.lambdify(x, yprime_curr, 'numpy')( self.x_shot[k] )
+            yprime_curr = sp.lambdify(x, yprime_curr, 'numpy')( X[k] )
             ypprime_curr = second_derivatives[curr_interface]
-            ypprime_curr = sp.lambdify(x, ypprime_curr, 'numpy')(self.x_shot[k])
+            ypprime_curr = sp.lambdify(x, ypprime_curr, 'numpy')(X[k])
 
-            Vk_curr = self.surface.V[k]
-            Vk_next = self.surface.V[k+1]
+            Vk_curr = self.surface.get_velocities_vector(next_case)[k-1]
+            Vk_next = self.surface.get_velocities_vector(next_case)[k]
 
             dy_curr = y_curr - y_prev
             dy_next = y_next - y_curr
-            dx_curr = self.x_shot[k] - self.x_shot[k-1]
-            dx_next = self.x_shot[k+1] - self.x_shot[k]
+            dx_curr = X[k] - X[k-1]
+            dx_next = X[k+1] - X[k]
 
             D_curr = ( dx_curr**2 + dy_curr**2 )**0.5
             D_next = ( dx_next**2 + dy_next**2 )**0.5
@@ -85,34 +85,34 @@ class SystemBuilder:
 
 
 
-    def _build_bk(self):
+    def _build_bk(self, X, next_case):
 
         x, k = sp.symbols('x'), 2
         bk = []
 
-        first_derivatives, _ = self._get_first_second_derivatives(self)
+        first_derivatives, _ = self._get_first_second_derivatives()
 
         # update every self.x_shot
 
-        while k < len(self.x_shot) - 1:
+        while k < len(X) - 1:
 
             curr_interface = self.ray.interfaces[k]
             prev_interface = self.ray.interfaces[k-1]
 
             y_curr = self.surface.interface_functions[curr_interface]
-            y_curr = sp.lambdify(x, y_curr, 'numpy')( self.x_shot[k] )
+            y_curr = sp.lambdify(x, y_curr, 'numpy')( X[k] )
             y_prev = self.surface.interface_functions[prev_interface]
-            y_prev = sp.lambdify(x, y_prev, 'numpy')( self.x_shot[k-1] )
+            y_prev = sp.lambdify(x, y_prev, 'numpy')( X[k-1] )
 
             yprime_curr = first_derivatives[curr_interface]
-            yprime_curr = sp.lambdify(x, yprime_curr, 'numpy')( self.x_shot[k] )
+            yprime_curr = sp.lambdify(x, yprime_curr, 'numpy')( X[k] )
             yprime_prev = first_derivatives[prev_interface]
-            yprime_prev = sp.lambdify(x, yprime_prev, 'numpy')( self.x_shot[k-1] )
+            yprime_prev = sp.lambdify(x, yprime_prev, 'numpy')( X[k-1] )
 
-            Vk_next = self.surface.V[k+1]
+            Vk_next = self.surface.get_velocities_vector(next_case)[k]
 
             dy_curr = y_curr - y_prev
-            dx_curr = self.x_shot[k] - self.x_shot[k-1]
+            dx_curr = X[k] - X[k-1]
 
             D_curr = ( dx_curr**2 + dy_curr**2 )**0.5
 
@@ -124,34 +124,34 @@ class SystemBuilder:
 
 
 
-    def _build_ck(self):
+    def _build_ck(self, X, next_case):
 
         x, k = sp.symbols('x'), 1
         ck = []
 
-        first_derivatives, _ = self._get_first_second_derivatives(self)
+        first_derivatives, _ = self._get_first_second_derivatives()
 
         # update every self.x_shot
 
-        while k < len(self.x_shot) - 2:
+        while k < len(X) - 2:
 
             curr_interface = self.ray.interfaces[k]
             next_interface = self.ray.interfaces[k+1]
 
             y_curr = self.surface.interface_functions[curr_interface]
-            y_curr = sp.lambdify(x, y_curr, 'numpy')( self.x_shot[k] )
+            y_curr = sp.lambdify(x, y_curr, 'numpy')( X[k] )
             y_next = self.surface.interface_functions[next_interface]
-            y_next = sp.lambdify(x, y_next, 'numpy')( self.x_shot[k+1] )
+            y_next = sp.lambdify(x, y_next, 'numpy')( X[k+1] )
 
             yprime_curr = first_derivatives[curr_interface]
-            yprime_curr = sp.lambdify(x, yprime_curr, 'numpy')( self.x_shot[k] )
+            yprime_curr = sp.lambdify(x, yprime_curr, 'numpy')( X[k] )
             yprime_next = first_derivatives[next_interface]
-            yprime_next = sp.lambdify(x, yprime_next, 'numpy')( self.x_shot[k+1] )
+            yprime_next = sp.lambdify(x, yprime_next, 'numpy')( X[k+1] )
 
-            Vk_curr = self.surface.V[k]
+            Vk_curr = self.surface.get_velocities_vector(next_case)[k-1]
 
             dy_next = y_next - y_curr
-            dx_next = self.x_shot[k+1] - self.x_shot[k]
+            dx_next = X[k+1] - X[k]
 
             D_next = ( dx_next**2 + dy_next**2 )**0.5
 
@@ -162,11 +162,11 @@ class SystemBuilder:
         return np.array(ck)
 
 
-    def _build_jacobian_matrix_A(self):
+    def _build_jacobian_matrix_A(self, X, next_case):
 
-        ak = self._build_ak(self)
-        bk = self._build_bk(self)
-        ck = self._build_ck(self)
+        ak = self._build_ak(X, next_case)
+        bk = self._build_bk(X, next_case)
+        ck = self._build_ck(X, next_case)
 
         # creating diagonals
         ak_diag = np.diag(ak)
@@ -177,35 +177,35 @@ class SystemBuilder:
 
 
     # function to get a bidiagonal matrix
-    def _build_bidiagonal_matrix_B(self):
+    def _build_bidiagonal_matrix_B(self, X):
 
-        N, k = len(self.x_shot) - 2, 1
+        N, k = len(X)-1, 1   # fix dimensions
         x = sp.symbols('x')
-        first_derivatives, _ = self._get_first_second_derivatives(self)
+        first_derivatives, _ = self._get_first_second_derivatives()
 
         B = np.zeros( (N, N+1) )
         main_diag, upper_diag = [], []
         
-        while k <= N:
+        while k < N:
 
             curr_interface = self.ray.interfaces[k]
             prev_interface = self.ray.interfaces[k-1]
             next_interface = self.ray.interfaces[k+1]
 
             y_prev = self.surface.interface_functions[prev_interface]
-            y_prev = sp.lambdify(x, y_prev, 'numpy')( self.x_shot[k-1] )
+            y_prev = sp.lambdify(x, y_prev, 'numpy')( X[k-1] )
             y_curr = self.surface.interface_functions[curr_interface]
-            y_curr = sp.lambdify(x, y_curr, 'numpy')( self.x_shot[k] )
+            y_curr = sp.lambdify(x, y_curr, 'numpy')( X[k] )
             y_next = self.surface.interface_functions[next_interface]
-            y_next = sp.lambdify(x, y_next, 'numpy')( self.x_shot[k+1] )
+            y_next = sp.lambdify(x, y_next, 'numpy')( X[k+1] )
 
             yprime_curr = first_derivatives[curr_interface]
-            yprime_curr = sp.lambdify(x, yprime_curr, 'numpy')( self.x_shot[k] )
+            yprime_curr = sp.lambdify(x, yprime_curr, 'numpy')( X[k] )
 
             dy_curr = y_curr - y_prev
             dy_next = y_next - y_curr
-            dx_curr = self.x_shot[k] - self.x_shot[k-1]
-            dx_next = self.x_shot[k+1] - self.x_shot[k]
+            dx_curr = X[k] - X[k-1]
+            dx_next = X[k+1] - X[k]
 
             D_curr = ( dx_curr**2 + dy_curr**2 )**0.5
             D_next = ( dx_next**2 + dy_next**2 )**0.5
@@ -223,26 +223,47 @@ class SystemBuilder:
         return B
     
 
-    def _get_v_hat(self):
+
+    def _build_receiver_matrix_B(self, X):
         pass
 
 
+
     # function for solving via homotopy, continuation is made on velocity
-    def get_first_ray(self, dl):
+    def get_first_ray(self, X, data_cases, continuation='v', dl=0.25):
+        '''
+        args:
+            * X (1D-array): Array containing every point in X to be solved.
+            * data_cases (2D-array): A 2D array containing 2 cases to calculate\
+            both velocities for known and desired case. Every case must be a\
+            sequence of 'P' and 'S'.
+        returns:
+            * final_guess (1D-array): a good first candidate of aproximations to\
+            be passed to newton method.
+        '''
 
         iterations = np.arange(0, 1+dl, dl)
-        final_guess = self.x_shot
+        final_guess = X
+
+        curr_case, next_case = data_cases
+
+        # PENDING: implement function to get receiver vector based on ray trail
+        continuation_options = {'v': [ self.surface.get_velocities_vector(curr_case),
+                                       self.surface.get_velocities_vector(next_case) ],
+                                'r': [ ]}  # implement later, a method called 'self.surface.get_receiver_vector()'
+        
+        curr_V, next_V = continuation_options[continuation]
 
         # it runs modifying the attribute self.x_shot according to homotopy, iteration goes here
         for _ in iterations:
 
-            Axv = self._build_jacobian_matrix_A(self)
-            Bxv = self._build_bidiagonal_matrix_B(self)
-            v_hat = self._get_v_hat(self)
-            x_dot = np.linalg.solve( Axv, -np.dot(Bxv, self.surface.V - v_hat) )
-            self.x_shot = self.x_shot + dl*x_dot
+            Axv = self._build_jacobian_matrix_A(final_guess, next_case)
+            Bxv = self._build_bidiagonal_matrix_B(final_guess)
 
-        return self.x_shot
+            x_dot = np.linalg.solve( Axv, -np.dot(Bxv, next_V - curr_V) )
+            final_guess = final_guess + dl*x_dot
+
+        return final_guess
 
 
 
@@ -269,7 +290,7 @@ class SystemBuilder:
         y_next = self.surface.interface_functions[next_interface]
         y_next = sp.lambdify(x, y_next, 'numpy')( x_next )
 
-        first_derivatives, _ = self._get_first_second_derivatives(self)
+        first_derivatives, _ = self._get_first_second_derivatives()
         yprime_curr = first_derivatives[curr_interface]
         yprime_curr = sp.lambdify(x, yprime_curr, 'numpy')( x_curr )
 
@@ -282,32 +303,48 @@ class SystemBuilder:
         return ray_before - ray_after
 
 
+
     # iteratively calls _snell_law_equation
     def _build_phi_array(self, X):
         '''
         '''
         N = len(self.x_shot)-1
-        phi = [ self._snell_law_equation(self, k_, X) for k_ in range(1, N) ]
+        phi = [ self._snell_law_equation(k_, X) for k_ in range(1, N) ]
 
         return np.array(phi)
 
 
-    def newton_solve(self, tol=1e-3, continuation='v'):
+
+    def newton_solve(self, data_cases, tol=1e-3, continuation='v'):
         '''
         args:
-            tol (float) : Error for calculations
-            continuation (string) : Must be either 'v' for applying continuation on
-                velocities or 'r' for continuation on receivers
+            * data_cases (2D-array) : List of 'P' and 'S' related to known first ray.
+            * tol (float) : Error for calculations.
+            * continuation (string) : Must be either 'v' for applying continuation on\
+            velocities or 'r' for continuation on receivers.
         returns:
-            ray_points (array) : solution of values on x where the ray interacts with
-                each interface throughout its trail.
+            * ray_points (array) : solution of values on x where the ray interacts with\
+            each interface throughout its trail.
         '''
 
         # raises an error for any string other than 'v' or 'r' on continuation parameter
         if continuation not in ['v', 'r']:
             raise ContinuationNotDefinedException
         
-        A_newton = self._build_jacobian_matrix_A(self)
+        curr_case, next_case = data_cases
 
+        current_X = self.get_first_ray(self.x_shot, data_cases)
 
-        pass
+        A_newton = self._build_jacobian_matrix_A(current_X, next_case)
+        phi = self._build_phi_array(current_X)
+        dxv = np.linalg.solve( A_newton, -phi )
+        X_sol = current_X + dxv
+
+        while np.max( np.abs(X_sol - current_X) ) > tol:
+            current_X = X_sol
+            A_newton = self._build_jacobian_matrix_A(current_X, next_case)
+            phi = self._build_phi_array(current_X)
+            dxv = np.linalg.solve( A_newton, -phi )
+            X_sol = current_X + dxv
+
+        return X_sol
