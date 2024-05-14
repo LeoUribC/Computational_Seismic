@@ -179,14 +179,14 @@ class SystemBuilder:
     # function to get a bidiagonal matrix
     def _build_bidiagonal_matrix_B(self, X):
 
-        N, k = len(X)-1, 1   # fix dimensions
+        N, k = len(X)-2, 1   # fix dimensions
         x = sp.symbols('x')
         first_derivatives, _ = self._get_first_second_derivatives()
 
         B = np.zeros( (N, N+1) )
         main_diag, upper_diag = [], []
         
-        while k < N:
+        while k <= N:
 
             curr_interface = self.ray.interfaces[k]
             prev_interface = self.ray.interfaces[k-1]
