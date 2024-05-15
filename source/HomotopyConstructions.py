@@ -261,13 +261,13 @@ class SystemBuilder:
             Bxv = self._build_bidiagonal_matrix_B(final_guess)
 
             x_dot = np.linalg.solve( Axv, -np.dot(Bxv, next_V - curr_V) )
-            final_guess = final_guess + dl*x_dot
+            final_guess[1:-1] = final_guess[1:-1] + dl*x_dot
 
         return final_guess
 
 
 
-    def _snell_law_equation(self, k, X):
+    def _snell_law_equation(self, k, X, next_case):
         '''
         docstring
         X must be every updated X vector from newton
@@ -276,7 +276,7 @@ class SystemBuilder:
         x = sp.symbols('x')
 
         # (pending: change the velocities' source, surface velocities not follow signature velocities)
-        v_curr, v_next = self.surface.V[k], self.surface.V[k+1]
+        v_curr, v_next = self.surface.get_velocities_vector(next_case)[k-1], self.surface.get_velocities_vector(next_case)[k]
         x_prev, x_curr, x_next = X[k-1], X[k], X[k+1]
 
         curr_interface = self.ray.interfaces[k]
@@ -305,11 +305,11 @@ class SystemBuilder:
 
 
     # iteratively calls _snell_law_equation
-    def _build_phi_array(self, X):
+    def _build_phi_array(self, X, next_case):
         '''
         '''
-        N = len(self.x_shot)-1
-        phi = [ self._snell_law_equation(k_, X) for k_ in range(1, N) ]
+        N = len(X)-1
+        phi = [ self._snell_law_equation(k_, X, next_case) for k_ in range(1, N) ]
 
         return np.array(phi)
 
@@ -334,17 +334,18 @@ class SystemBuilder:
         curr_case, next_case = data_cases
 
         current_X = self.get_first_ray(self.x_shot, data_cases)
+        X_sol = current_X.copy()
 
         A_newton = self._build_jacobian_matrix_A(current_X, next_case)
-        phi = self._build_phi_array(current_X)
+        phi = self._build_phi_array(current_X, next_case)
         dxv = np.linalg.solve( A_newton, -phi )
-        X_sol = current_X + dxv
+        X_sol[1:-1] = current_X[1:-1] + dxv
 
         while np.max( np.abs(X_sol - current_X) ) > tol:
             current_X = X_sol
             A_newton = self._build_jacobian_matrix_A(current_X, next_case)
-            phi = self._build_phi_array(current_X)
+            phi = self._build_phi_array(current_X, next_case)
             dxv = np.linalg.solve( A_newton, -phi )
-            X_sol = current_X + dxv
+            X_sol[1:-1] = current_X[1:-1] + dxv
 
         return X_sol
