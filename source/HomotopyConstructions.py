@@ -40,13 +40,13 @@ class SystemBuilder:
     def _build_ak(self, X, next_case):
 
         x, k = sp.symbols('x'), 1
-        ak = []
+        N, ak = len(X)-2, []
 
         first_derivatives, second_derivatives = self._get_first_second_derivatives()
 
-        # update every self.x_shot
+        # update for every guess
 
-        while k < len(X) - 1:
+        while k <= N:
 
             curr_interface = self.ray.interfaces[k]
             prev_interface = self.ray.interfaces[k-1]
@@ -88,13 +88,13 @@ class SystemBuilder:
     def _build_bk(self, X, next_case):
 
         x, k = sp.symbols('x'), 2
-        bk = []
+        N, bk = len(X)-2, []
 
         first_derivatives, _ = self._get_first_second_derivatives()
 
         # update every self.x_shot
 
-        while k < len(X) - 1:
+        while k <= N:
 
             curr_interface = self.ray.interfaces[k]
             prev_interface = self.ray.interfaces[k-1]
@@ -127,13 +127,13 @@ class SystemBuilder:
     def _build_ck(self, X, next_case):
 
         x, k = sp.symbols('x'), 1
-        ck = []
+        N1, ck = len(X)-3, []
 
         first_derivatives, _ = self._get_first_second_derivatives()
 
         # update every self.x_shot
 
-        while k < len(X) - 2:
+        while k <= N1:
 
             curr_interface = self.ray.interfaces[k]
             next_interface = self.ray.interfaces[k+1]
