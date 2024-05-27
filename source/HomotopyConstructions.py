@@ -260,7 +260,8 @@ class SystemBuilder:
             Axv = self._build_jacobian_matrix_A(final_guess, next_case)
             Bxv = self._build_bidiagonal_matrix_B(final_guess)
 
-            x_dot = np.linalg.solve( Axv, -np.dot(Bxv, next_V - curr_V) )
+            # NOTE : use sparse solvers
+            x_dot = np.linalg.solve( Axv, -np.dot(Bxv, next_V - curr_V ) )
             final_guess[1:-1] = final_guess[1:-1] + dl*x_dot
 
         return final_guess
@@ -342,7 +343,7 @@ class SystemBuilder:
         X_sol[1:-1] = current_X[1:-1] + dxv
 
         while np.max( np.abs(X_sol - current_X) ) > tol:
-            current_X = X_sol
+            current_X = X_sol.copy()
             A_newton = self._build_jacobian_matrix_A(current_X, next_case)
             phi = self._build_phi_array(current_X, next_case)
             dxv = np.linalg.solve( A_newton, -phi )
